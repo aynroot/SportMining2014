@@ -6,7 +6,7 @@ from selenium.webdriver.support import expected_conditions as EC
 
 
 def get_all_games_urls_per_season(season_year):
-    url = "http://uk.soccerway.com/national/england/premier-league/%d-%d/regular-season/r8926/games/" % (season_year, season_year + 1)
+    url = "http://uk.soccerway.com/national/england/premier-league/%d-%d/regular-season/matches/" % (season_year, season_year + 1)
     final_games_urls = []
     driver = webdriver.Firefox()
     try:
@@ -17,7 +17,7 @@ def get_all_games_urls_per_season(season_year):
             for link in links:
                 final_games_urls.append(link.get_attribute("href"))
 
-            previous_link = driver.find_element_by_id("page_competition_1_block_competition_games_6_previous")
+            previous_link = driver.find_element_by_id("page_competition_1_block_competition_matches_6_previous")
             if 'disabled' in previous_link.get_attribute("class"):
                 break
             previous_link.click()
