@@ -43,6 +43,18 @@ def get_all_games_urls_per_season(season_year):
     return final_games_urls
 
 
+def split_score(score_str):
+    return map(int, score_str.split('-'))
+
+
+def convert_game_results(game_details):
+    game_details["ScoreA"], game_details["ScoreB"] = split_score(game_details["Score"])
+    game_details["HalfTimeA"], game_details["HalfTimeB"] = split_score(game_details["HalfTime"])
+    game_details["FullTimeA"], game_details["FullTimeB"] = split_score(game_details["FullTime"])
+    return game_details
+
+
+
 def process_game(game_url):
     html = urllib2.urlopen(game_url).read()
     soup = BeautifulSoup(html)
@@ -52,7 +64,8 @@ def process_game(game_url):
     details = game_info_div.find_all(class_="details clearfix")
     game_details = {
         u"TeamA": game_info_div.find(class_="container left").h3.a.text,
-        u"TeamB": game_info_div.find(class_="container right").h3.a.text
+        u"TeamB": game_info_div.find(class_="container right").h3.a.text,
+        u"Score": game_info_div.find(class_="container middle").h3.text
     }
     for details_block in details[:3]:
         for dt, dd in zip(details_block.dl.find_all('dt'), details_block.dl.find_all('dd')):
@@ -78,14 +91,13 @@ def process_game(game_url):
             game_details[u"PosessionB"] = stat["y"]
         else:
             assert(False)  # should not reach this part
+    game_details = convert_game_results(game_details)
     return game_details
 
 
 def get_games_statistics(games_urls):
     games = []
-    for index, game_url in enumerate(games_urls):
-        if index % 20 == 0:
-            print '%d urls processed' % index
+    for game_url in games_urls:
         for i in xrange(3):
             try:
                 games.append(process_game(game_url))
@@ -93,14 +105,16 @@ def get_games_statistics(games_urls):
             except:
                 traceback.print_exc()
                 print 'Error at url: %s' % game_url
-                sleep(3)
 
-    columns_list = ['TeamA', 'TeamB', 'Date', 'GameWeek', 'Venue',
-                    'Attendance', 'HalfTime', 'FullTime', 'KickOff',
+    columns_list = ['TeamA', 'TeamB', 'ScoreA', 'ScoreB', 'Date', 'KickOff',
+                    'GameWeek', 'Venue', 'Attendance',
+                    'HalfTimeA', 'HalfTimeB', 'FullTimeA', 'FullTimeB',
                     'PosessionA', 'PosessionB', 'CornersA', 'CornersB',
                     'FoulsA', 'FoulsB', 'ShotsOnTargetA', 'ShotsOnTargetB',
                     'ShotsWideA', 'ShotsWideB', 'OffsidesA', 'OffsidesB']
     games_df = pd.DataFrame(games, columns=columns_list)
+    games_df['Date'] = pd.to_datetime(games_df['Date'], format='%d %B %Y')
+    games_df = games_df.sort('Date')
     return games_df
 
 
@@ -118,4 +132,4 @@ if __name__ == '__main__':
         with open(args.games_links_filename) as f:
             games_urls = [line.strip() for line in f if line.strip()]
     games_df = get_games_statistics(games_urls)
-    games_df.to_csv(path_or_buf=args.output_filename, header=True, index=False)
+    games_df.to_csv(path_or_buf=args.output_filename, header=True, index=False, date_format='%d-%m-%Y')
