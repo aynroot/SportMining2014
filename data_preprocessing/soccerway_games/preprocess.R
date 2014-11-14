@@ -3,7 +3,6 @@
 #
 require(dplyr)
 require(sqldf)
-require(sprintf)
 
 
 read_raw_data <- function() {
@@ -55,33 +54,39 @@ get_season <- function(data) {
 # }
 
 
-calc_cumulative_score <- function(data) {
-    data$ScoreDiffSeasonA <- rep(NA, dim(data)[1])
-    data$ScoreDiffSeasonB <- rep(NA, dim(data)[1])
+make_cumulative_stats_per_season <- function(data, var_prefix) {
+    varA <- paste0(var_prefix, "A")
+    varB <- paste0(var_prefix, "B")
+    varDiffSeasonA <- paste0(var_prefix, "DiffSeasonA")
+    varDiffSeasonB <- paste0(var_prefix, "DiffSeasonB")
+    varDiffTeamSeason <- paste0(var_prefix, "DiffTeamSeason")
+
+    data[[varDiffSeasonA]] <- rep(NA, dim(data)[1])
+    data[[varDiffSeasonB]] <- rep(NA, dim(data)[1])
     for (season_year in unique(data$Season)) {
         season_data <- filter(data, Season == season_year)
         for (team_name in levels(factor(season_data$TeamA))) {
             cum_value <- 0
-            query <- sprintf("select ID, TeamA, TeamB, ScoreA, ScoreB, Date from season_data
-                         where TeamA = '%s' or TeamB = '%s' order by Date",
-                             team_name, team_name)
+            query <- sprintf("select ID, TeamA, TeamB, %s, %s, Date from season_data
+                             where TeamA = '%s' or TeamB = '%s' order by Date",
+                             varA, varB, team_name, team_name)
             team_df <- sqldf(query)
-            team_df$ScoreDiffTeamSeason <- apply(team_df, 1, function(row) {
+            team_df[[varDiffTeamSeason]] <- apply(team_df, 1, function(row) {
                 if (row[["TeamA"]] == team_name)
                     # access global cum_value
-                    cum_value <<- cum_value + as.integer(row[["ScoreA"]]) - as.integer(row[["ScoreB"]])
+                    cum_value <<- cum_value + as.numeric(row[[varA]]) - as.numeric(row[[varB]])
                 else
-                    cum_value <<- cum_value + as.integer(row[["ScoreB"]]) - as.integer(row[["ScoreA"]])
+                    cum_value <<- cum_value + as.numeric(row[[varB]]) - as.numeric(row[[varA]])
                 cum_value
             })
-            data <- merge(data, team_df, by=c("ID", "TeamA", "TeamB", "ScoreA", "ScoreB", "Date"), all=T)
-            data$ScoreDiffSeasonA <- as.integer(apply(data, 1, function(row)
-                ifelse(row[["TeamA"]] == team_name && !is.na(row[["ScoreDiffTeamSeason"]]),
-                       row[["ScoreDiffTeamSeason"]], row[["ScoreDiffSeasonA"]])))
-            data$ScoreDiffSeasonB <- as.integer(apply(data, 1, function(row)
-                ifelse(row[["TeamB"]] == team_name && !is.na(row[["ScoreDiffTeamSeason"]]),
-                       row[["ScoreDiffTeamSeason"]], row[["ScoreDiffSeasonB"]])))
-            data$ScoreDiffTeamSeason <- NULL
+            data <- merge(data, team_df, by=c("ID", "TeamA", "TeamB", varA, varB, "Date"), all=T)
+            data[[varDiffSeasonA]] <- as.numeric(apply(data, 1, function(row)
+                ifelse(row[["TeamA"]] == team_name && !is.na(row[[varDiffTeamSeason]]),
+                       row[[varDiffTeamSeason]], row[[varDiffSeasonA]])))
+            data[[varDiffSeasonB]] <- as.numeric(apply(data, 1, function(row)
+                ifelse(row[["TeamB"]] == team_name && !is.na(row[[varDiffTeamSeason]]),
+                       row[[varDiffTeamSeason]], row[[varDiffSeasonB]])))
+            data[[varDiffTeamSeason]] <- NULL
         }
     }
     data
@@ -114,11 +119,10 @@ preprocess <- function(raw_data) {
     data$ShotsOnTargetDiff <- data$ShotsOnTargetA - data$ShotsOnTargetB
     data$ShotsWideDiff <- data$ShotsWideA - data$ShotsWideB
 
-    data <- calc_cumulative_score(data)
-    # data <- calc_cumulative_stats_per_season(data, "ScoreDiff", "ScoreDiffSeason")
-    # data <- calc_cumulative_stats_per_season(data, "PosessionDiff", "PosessionDiffSeason")
-    # data <- calc_cumulative_stats_per_season(data, "ShotsOnTargetDiff", "ShotsOnTargetDiffSeason")
-    # data <- calc_cumulative_stats_per_season(data, "ShotsWideDiff", "ShotsWideDiffSeason")
+    data <- make_cumulative_stats_per_season(data, "Score")
+    data <- make_cumulative_stats_per_season(data, "Posession")
+    data <- make_cumulative_stats_per_season(data, "ShotsOnTarget")
+    data <- make_cumulative_stats_per_season(data, "ShotsWide")
 
     # TODO: make GamesPlayedA, GamesPlayedB parameter (?)
 
