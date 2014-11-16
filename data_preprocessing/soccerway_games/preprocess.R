@@ -18,14 +18,20 @@ split_data_by_date <- function(raw_data, date_threshold="2013-05-19") {
 }
 
 
-save_data <- function() {
-
+save_data <- function(data) {
+    write.csv(data, paste0(getwd(), "/data/soccerway_games_stats_preprocessed.csv"), row.names = FALSE)
 }
 
 process_paired_variables <- function(data, name_a, name_b, name) {
     data[[name]] <- data[[name_a]] + data[[name_b]]
     data[[name_a]] <- data[[name_a]] / data[[name]]
     data[[name_b]] <- 1 - data[[name_a]]
+
+    # handle NaNs because of 0/0 operations
+    if (length(which(data[[name]] == 0))) {
+        data[data[[name_a]] == "NaN",][[name_a]] <- 0.5
+        data[data[[name_b]] == "NaN",][[name_b]] <- 0.5
+    }
     data
 }
 
@@ -54,12 +60,18 @@ get_season <- function(data) {
 # }
 
 
-make_cumulative_stats_per_season <- function(data, var_prefix) {
+make_cumulative_stats_per_season <- function(data, var_prefix, mean = FALSE) {
     varA <- paste0(var_prefix, "A")
     varB <- paste0(var_prefix, "B")
-    varDiffSeasonA <- paste0(var_prefix, "DiffSeasonA")
-    varDiffSeasonB <- paste0(var_prefix, "DiffSeasonB")
-    varDiffTeamSeason <- paste0(var_prefix, "DiffTeamSeason")
+    if (mean) {
+        varDiffSeasonA <- paste0(var_prefix, "DiffSeasonMeanA")
+        varDiffSeasonB <- paste0(var_prefix, "DiffSeasonMeanB")
+        varDiffTeamSeason <- paste0(var_prefix, "DiffTeamSeasonMean")
+    } else {
+        varDiffSeasonA <- paste0(var_prefix, "DiffSeasonA")
+        varDiffSeasonB <- paste0(var_prefix, "DiffSeasonB")
+        varDiffTeamSeason <- paste0(var_prefix, "DiffTeamSeason")
+    }
 
     data[[varDiffSeasonA]] <- rep(NA, dim(data)[1])
     data[[varDiffSeasonB]] <- rep(NA, dim(data)[1])
@@ -67,6 +79,7 @@ make_cumulative_stats_per_season <- function(data, var_prefix) {
         season_data <- filter(data, Season == season_year)
         for (team_name in levels(factor(season_data$TeamA))) {
             cum_value <- 0
+            games_played <- 0
             query <- sprintf("select ID, TeamA, TeamB, %s, %s, Date from season_data
                              where TeamA = '%s' or TeamB = '%s' order by Date",
                              varA, varB, team_name, team_name)
@@ -77,7 +90,11 @@ make_cumulative_stats_per_season <- function(data, var_prefix) {
                     cum_value <<- cum_value + as.numeric(row[[varA]]) - as.numeric(row[[varB]])
                 else
                     cum_value <<- cum_value + as.numeric(row[[varB]]) - as.numeric(row[[varA]])
-                cum_value
+                games_played <<- games_played + 1
+                if (mean)
+                    cum_value / games_played
+                else
+                    cum_value
             })
             data <- merge(data, team_df, by=c("ID", "TeamA", "TeamB", varA, varB, "Date"), all=T)
             data[[varDiffSeasonA]] <- as.numeric(apply(data, 1, function(row)
@@ -94,17 +111,17 @@ make_cumulative_stats_per_season <- function(data, var_prefix) {
 
 preprocess <- function(raw_data) {
     data <- raw_data
+    data$Date <- as.Date(raw_data$Date, "%d-%m-%Y")
+
     # make ID variable for better merging
     data <- arrange(data, Date)
     data <- mutate(data, ID = as.integer(rownames(data)))
-
-    data$Date <- as.Date(raw_data$Date, "%d-%m-%Y")
     data$IsWinnerA <- as.factor((data$ScoreA > data$ScoreB))
 
     # make percetage data for some paired variables
-    data <- process_paired_variables(data, "CornersA", "CornersB", "Corners")
-    data <- process_paired_variables(data, "FoulsA", "FoulsB", "Fouls")
-    data <- process_paired_variables(data, "OffsidesA", "OffsidesB", "Offsides")
+    data <- process_paired_variables(data, "CornersA", "CornersB", "CornersOverall")
+    data <- process_paired_variables(data, "FoulsA", "FoulsB", "FoulsOverall")
+    data <- process_paired_variables(data, "OffsidesA", "OffsidesB", "OffsidesOverall")
 
     # convert posession to [0..1]
     data$PosessionA <- data$PosessionA / 100
@@ -124,9 +141,9 @@ preprocess <- function(raw_data) {
     data <- make_cumulative_stats_per_season(data, "ShotsOnTarget")
     data <- make_cumulative_stats_per_season(data, "ShotsWide")
 
-    # TODO: make GamesPlayedA, GamesPlayedB parameter (?)
-
-    # TODO: make variables for median statistics (diff in halftime, diff in fulltime, corners, offsides)
+    data <- make_cumulative_stats_per_season(data, "Corners", mean = TRUE)
+    data <- make_cumulative_stats_per_season(data, "Offsides", mean = TRUE)
+    data <- make_cumulative_stats_per_season(data, "Fouls", mean = TRUE)
     data
 }
 
@@ -136,3 +153,11 @@ preprocess <- function(raw_data) {
 
 preprocessed_data <- preprocess(read_raw_data())
 data <- split_data_by_date(preprocessed_data)
+
+
+
+
+
+
+
+
