@@ -1,6 +1,6 @@
 
 source(paste0(getwd(), "/data_preprocessing/soccerway_games/functions_basic_preprocessing.R"))
-source(paste0(getwd(), "/data_preprocessing/functions_kpp_features.R"))
+source(paste0(getwd(), "/feature_engineering/functions_kpp_features.R"))
 
 require(caret)
 set.seed(42)
@@ -10,10 +10,10 @@ preprocessed_data <- read_raw_data() %>% basic_preprocess() %>% make_diff_stats(
 # split data by teams and calculate their (TG)KPP stats
 K <- 3
 varnames_lst <- list(
-    c("ScoreA", "ScoreB", "ScoreKPP3", "ScoreDiff", "ScoreDiffKPP3"),
-    c("CornersA", "CornersB", "CornersKPP3", "CornersDiff", "CornersDiffKPP3"),
-    c("ShotsOnTargetA", "ShotsOnTargetB", "ShotsOnTargetKPP3", "ShotsOnTargetDiff", "ShotsOnTargetDiffKPP3"),
-    c("PosessionA", "PosessionB", "PosessionKPP3", "PosessionDiff", "PosessionDiffKPP3")
+    c("ScoreA", "ScoreB", "ScoreKPP", "ScoreDiff", "ScoreDiffKPP"),
+    c("CornersA", "CornersB", "CornersKPP", "CornersDiff", "CornersDiffKPP"),
+    c("ShotsOnTargetA", "ShotsOnTargetB", "ShotsOnTargetKPP", "ShotsOnTargetDiff", "ShotsOnTargetDiffKPP"),
+    c("PosessionA", "PosessionB", "PosessionKPP", "PosessionDiff", "PosessionDiffKPP")
 )
 
 data <- preprocessed_data
@@ -46,10 +46,10 @@ for (team_name in levels(data$TeamA)) {
 data <- na.omit(data)
 
 # leave only necessary columns
-vars <- c("GameWeek", "ScoreDiffKPP3A", "ScoreDiffKPP3B",
-          "CornersDiffKPP3A", "CornersDiffKPP3B",
-          "ShotsOnTargetDiffKPP3A", "ShotsOnTargetDiffKPP3B",
-          "PosessionDiffKPP3A", "PosessionDiffKPP3B",
+vars <- c("GameWeek", "ScoreDiffKPPA", "ScoreDiffKPPB",
+          "CornersDiffKPPA", "CornersDiffKPPB",
+          "ShotsOnTargetDiffKPPA", "ShotsOnTargetDiffKPPB",
+          "PosessionDiffKPPA", "PosessionDiffKPPB",
           "IsWinnerA", "Date")
 
 data <- data[, vars]
@@ -69,4 +69,5 @@ tt_data$test$IsWinnerPredicted <- as.factor(ifelse(tt_data$test$Predictions > 0,
 
 cm <- confusionMatrix(tt_data$test$IsWinnerPredicted, tt_data$test$IsWinnerA)
 cm
+
 
