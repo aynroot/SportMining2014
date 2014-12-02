@@ -5,14 +5,14 @@
 require(caret)
 require(AUC)
 
-select_by_accuracy <- function(factor_predictions, true_values) {
+get_accuracies<- function(factor_predictions, true_values) {
     accuracies <- sapply(factor_predictions, function(predictions_vec) {
-        accuracy(predictions_vec, true_values))
+        sum(predictions_vec == true_values) / length(true_values)
     })
-    aucs
+    accuracies
 }
 
-select_by_auc <- function(predictions, true_values) {
+get_aucs <- function(predictions, true_values) {
     aucs <- sapply(predictions, function(predictions_vec) {
         auc(roc(predictions_vec, true_values))
     })

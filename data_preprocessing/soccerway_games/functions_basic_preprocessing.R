@@ -135,7 +135,8 @@ basic_preprocess <- function(raw_data) {
 make_diff_stats <- function(data) {
     data$ScoreDiff <- data$ScoreA - data$ScoreB
     data$CornersDiff <- data$CornersA - data$CornersB
-    data$PosessionDiff <- data$PosessionA - data$PosessionB
+    if ("PosessionA" %in% names(data))
+        data$PosessionDiff <- data$PosessionA - data$PosessionB
     data$ShotsOnTargetDiff <- data$ShotsOnTargetA - data$ShotsOnTargetB
     data$ShotsWideDiff <- data$ShotsWideA - data$ShotsWideB
     data
